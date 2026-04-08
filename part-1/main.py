@@ -12,6 +12,7 @@ import random
 import argparse
 from utils import *
 import os
+from datasets.utils.info_utils import ExpectedMoreSplits
 
 # Set seed
 random.seed(0)
@@ -24,6 +25,14 @@ torch.backends.cudnn.benchmark = False
 # Tokenize the input
 def tokenize_function(examples):
     return tokenizer(examples["text"], padding="max_length", truncation=True)
+
+
+# Added by Copilot to resolve ExpectedMoreSplits error
+def load_imdb_dataset():
+    try:
+        return load_dataset("imdb")
+    except ExpectedMoreSplits:
+        return load_dataset("imdb", ignore_verifications=True)
 
 
 # Core training function
@@ -45,7 +54,21 @@ def do_train(args, model, train_dataloader, save_dir="./out"):
     # You can use progress_bar.update(1) to see the progress during training
     # You can refer to the pytorch tutorial covered in class for reference
 
-    raise NotImplementedError
+    for epoch in range(num_epochs):
+        for batch in train_dataloader:
+            # move batch to device (copy from core evaluation function)
+            batch = {k: v.to(device) for k, v in batch.items()}
+            
+            # forward pass
+            outputs = model(**batch)
+            loss = outputs.loss
+
+            # backward pass and optimization step
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            lr_scheduler.step()
+            progress_bar.update(1)
 
     ##### YOUR CODE ENDS HERE ######
 
@@ -93,7 +116,25 @@ def create_augmented_dataloader(args, dataset):
     # dataloader will be for the original training split augmented with 5k random transformed examples from the training set.
     # You may find it helpful to see how the dataloader was created at other place in this code.
 
-    raise NotImplementedError
+    # get original dataset
+    original_dataset = dataset["train"]
+
+    # below code is mostly copied from create_transformed_dataloader()
+
+    # randomly select 5k examples from original dataset to transform with custom_transform
+    transformed_examples = original_dataset.shuffle(seed=42).select(range(5000)).map(custom_transform, load_from_cache_file=False)
+    # now tokenize
+    transformed_tokenized_examples = transformed_examples.map(tokenize_function, batched=True, load_from_cache_file=False)
+    # remove text col, rename label -> labels, set format to torch
+    transformed_tokenized_examples = transformed_tokenized_examples.remove_columns(["text"])
+    transformed_tokenized_examples = transformed_tokenized_examples.rename_column("label", "labels")
+    transformed_tokenized_examples.set_format("torch")
+
+    # concat original with 5k random transformed examples
+    train_dataset = concatenate_datasets([original_dataset, transformed_tokenized_examples])
+
+    # shuffle
+    train_dataloader = DataLoader(train_dataset, shuffle=True, batch_size=args.batch_size)
 
     ##### YOUR CODE ENDS HERE ######
 
@@ -158,7 +199,7 @@ if __name__ == "__main__":
     tokenizer = AutoTokenizer.from_pretrained("bert-base-cased")
 
     # Tokenize the dataset
-    dataset = load_dataset("imdb")
+    dataset = load_imdb_dataset()  # use helper
     tokenized_dataset = dataset.map(tokenize_function, batched=True)
 
     # Prepare dataset for use by model
