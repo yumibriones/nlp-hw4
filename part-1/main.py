@@ -13,6 +13,7 @@ import argparse
 from utils import *
 import os
 from datasets.utils.info_utils import ExpectedMoreSplits
+from datasets import concatenate_datasets
 
 # Set seed
 random.seed(0)
@@ -116,21 +117,24 @@ def create_augmented_dataloader(args, dataset):
     # dataloader will be for the original training split augmented with 5k random transformed examples from the training set.
     # You may find it helpful to see how the dataloader was created at other place in this code.
 
-    # get original dataset
-    original_dataset = dataset["train"]
+    # tokenize original dataset like in create_transformed_dataloder()
+    original_dataset = dataset["train"].map(tokenize_function, batched=True, load_from_cache_file=False)
+    original_dataset = original_dataset.remove_columns(["text"])
+    original_dataset = original_dataset.rename_column("label", "labels")
+    original_dataset.set_format("torch")
 
-    # below code is mostly copied from create_transformed_dataloader()
+    # now randomly sample 5k samples from training set and apply custom_transform
+    transformed_examples = dataset["train"].shuffle(seed=42).select(range(5000)).map(
+        custom_transform, load_from_cache_file=False
+    )
 
-    # randomly select 5k examples from original dataset to transform with custom_transform
-    transformed_examples = original_dataset.shuffle(seed=42).select(range(5000)).map(custom_transform, load_from_cache_file=False)
-    # now tokenize
+    # then tokenize transformed examples like above
     transformed_tokenized_examples = transformed_examples.map(tokenize_function, batched=True, load_from_cache_file=False)
-    # remove text col, rename label -> labels, set format to torch
     transformed_tokenized_examples = transformed_tokenized_examples.remove_columns(["text"])
     transformed_tokenized_examples = transformed_tokenized_examples.rename_column("label", "labels")
     transformed_tokenized_examples.set_format("torch")
 
-    # concat original with 5k random transformed examples
+    # concat datasets assuming same structure
     train_dataset = concatenate_datasets([original_dataset, transformed_tokenized_examples])
 
     # shuffle
@@ -157,6 +161,7 @@ def create_transformed_dataloader(args, dataset, debug_transformation):
 
         exit()
 
+    # this part is important!
     transformed_dataset = dataset["test"].map(custom_transform, load_from_cache_file=False)
     transformed_tokenized_dataset = transformed_dataset.map(tokenize_function, batched=True, load_from_cache_file=False)
     transformed_tokenized_dataset = transformed_tokenized_dataset.remove_columns(["text"])

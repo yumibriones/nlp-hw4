@@ -44,7 +44,12 @@ def custom_transform(example):
 
     # You should update example["text"] using your transformation
 
-    raise NotImplementedError
+    example["text"] = example["text"].upper()
+    example["text"] = example["text"].replace("A", "4")
+    example["text"] = example["text"].replace("E", "3")
+    example["text"] = example["text"].replace("I", "1")
+    example["text"] = example["text"].replace("O", "0")
+    example["text"] = example["text"].replace("S", "5")
 
     ##### YOUR CODE ENDS HERE ######
 
