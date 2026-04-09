@@ -192,7 +192,7 @@ def custom_transform(example):
         return detokenizer.detokenize(new_words)
 
     # Randomly repeat vowels and punctuation
-    # That was so gooooood!!!
+    # That was sooooo good!!!
     def _randomly_repeat_vowels(text, sample_prob=0.1, word_prob=0.5):
         if random.random() >= sample_prob:
             return text
