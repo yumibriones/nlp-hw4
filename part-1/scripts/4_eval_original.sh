@@ -19,4 +19,4 @@ set -euo pipefail
 cd /gpfs/scratch/yb2612/classes/nlp/hw4/nlp-hw4/part-1
 
 # run script
-python3 main.py --eval
+python3 main.py --eval --model_dir out_augmented

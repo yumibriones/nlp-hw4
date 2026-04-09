@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --partition=gl40s_dev,gl40s_short,gl40s_long,gpu8_short,gpu8_medium,gpu8_long,gpu4_dev,gpu4_short,gpu4_medium,gpu4_long,a100_dev,a100_short,a100_long
-#SBATCH --job-name=5_eval_transformed
+#SBATCH --job-name=2_eval_transformed
 #SBATCH --output=logs/%x-%j.out
 #SBATCH --error=logs/%x-%j.err
 #SBATCH --time=04:00:00
@@ -19,4 +19,4 @@ set -euo pipefail
 cd /gpfs/scratch/yb2612/classes/nlp/hw4/nlp-hw4/part-1
 
 # run script
-python3 main.py --eval_transformed --model_dir out_augmented
+python3 main.py --eval_transformed --debug_transformation
