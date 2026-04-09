@@ -1,24 +1,22 @@
 #!/bin/bash
+#SBATCH --partition=gl40s_dev,gl40s_short,gl40s_long,gpu8_short,gpu8_medium,gpu8_long,gpu4_dev,gpu4_short,gpu4_medium,gpu4_long,a100_dev,a100_short,a100_long
 #SBATCH --job-name=4_eval_original
 #SBATCH --output=logs/%x-%j.out
 #SBATCH --error=logs/%x-%j.err
-#SBATCH --time=02:00:00
+#SBATCH --time=04:00:00
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
-#SBATCH --mem=16G
+#SBATCH --mem=50G
 
-set -euo pipefail
-
-# Move to part-1 regardless of where sbatch is launched from.
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "${SCRIPT_DIR}/.."
-
-mkdir -p logs
-
-# Activate your conda env.
+# activate conda env
 source ~/.bashrc
 conda activate nlp_hw4_clean
 
-MODEL_DIR="${MODEL_DIR:-./out_augmented}"
+# exit immediately if a command exits with a non-zero status, if an undefined variable is used, or if any command in a pipeline fails
+set -euo pipefail
 
-python3 main.py --eval --model_dir "${MODEL_DIR}"
+# move to part-1 folder
+cd /gpfs/scratch/yb2612/classes/nlp/hw4/nlp-hw4/part-1
+
+# run script
+python3 main.py --eval
