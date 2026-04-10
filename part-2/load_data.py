@@ -30,6 +30,7 @@ class T5Dataset(Dataset):
             * data_folder (str): Path to folder containing data files
             * split (str): "train", "dev", or "test"
         '''
+        # make sure split is valid
         if split not in ["train", "dev", "test"]:
             raise ValueError("split must be one of 'train', 'dev', or 'test'")
         # You should be using the 'google-t5/t5-small' tokenizer checkpoint to tokenize both the encoder and decoder output. 

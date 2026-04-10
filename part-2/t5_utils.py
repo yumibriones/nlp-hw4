@@ -9,9 +9,21 @@ import wandb
 
 DEVICE = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
+
+def get_checkpoint_dir(args):
+    """Added helper function to build checkpoint directory path for save/load."""
+    model_type = 'ft' if args.finetune else 'scr'
+    return os.path.join('checkpoints', f'{model_type}_experiments', args.experiment_name)
+
 def setup_wandb(args):
     # Implement this if you wish to use wandb in your experiments
-    pass
+    os.environ['WANDB_DIR'] = "logs/"
+    wandb.init(project = "NLP HW4", 
+                name = args.experiment_name,
+                notes = 'N/A',
+                tags = ['Prototype', 'PyTorch'],
+                config = args)
+    print('W&B logger initialized')
 
 def initialize_model(args):
     '''
@@ -20,7 +32,18 @@ def initialize_model(args):
     or training a T5 model initialized with the 'google-t5/t5-small' config
     from scratch.
     '''
-    pass
+    if args.model_type == "pretrained":
+        # get pretrained model (simplest)
+        model = T5ForConditionalGeneration.from_pretrained('google-t5/t5-small')
+    elif args.model_type == "scratch":
+        # get config
+        config = T5Config.from_pretrained('google-t5/t5-small')
+        # initialize model with config
+        model = T5ForConditionalGeneration(config)
+    else:
+        raise ValueError("model_type must be either 'pretrained' or 'scratch'")
+    # make sure to move model to device!
+    return model.to(DEVICE)
 
 def mkdir(dirpath):
     if not os.path.exists(dirpath):
@@ -31,11 +54,23 @@ def mkdir(dirpath):
 
 def save_model(checkpoint_dir, model, best):
     # Save model checkpoint to be able to load the model later
-    pass
+    mkdir(checkpoint_dir)
+    if best:
+        checkpoint_path = os.path.join(checkpoint_dir, 'best_model.pt')
+    else:
+        checkpoint_path = os.path.join(checkpoint_dir, 'model.pt')
+    torch.save(model.state_dict(), checkpoint_path)
 
 def load_model_from_checkpoint(args, best):
     # Load model from a checkpoint
-    pass
+    checkpoint_dir = get_checkpoint_dir(args)
+    if best:
+        checkpoint_path = os.path.join(checkpoint_dir, 'best_model.pt')
+    else:        
+        checkpoint_path = os.path.join(checkpoint_dir, 'model.pt')
+    model = initialize_model(args)
+    model.load_state_dict(torch.load(checkpoint_path, map_location=DEVICE))
+    return model.to(DEVICE)
 
 def initialize_optimizer_and_scheduler(args, model, epoch_length):
     optimizer = initialize_optimizer(args, model)

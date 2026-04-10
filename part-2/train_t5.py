@@ -7,7 +7,7 @@ import torch.nn as nn
 import numpy as np
 import wandb
 
-from t5_utils import initialize_model, initialize_optimizer_and_scheduler, save_model, load_model_from_checkpoint, setup_wandb
+from t5_utils import initialize_model, initialize_optimizer_and_scheduler, save_model, load_model_from_checkpoint, setup_wandb, get_checkpoint_dir
 from transformers import GenerationConfig
 from transformers import T5TokenizerFast
 from load_data import load_t5_data
@@ -24,6 +24,8 @@ def get_args():
 
     # Model hyperparameters
     parser.add_argument('--finetune', action='store_true', help="Whether to finetune T5 or not")
+    parser.add_argument('--model_type', type=str, default="pretrained", choices=["pretrained", "scratch"],
+                        help="Whether to finetune the pretrained model associated with the 'google-t5/t5-small' checkpoint or to train a T5 model initialized with the 'google-t5/t5-small' config from scratch")
     
     # Training hyperparameters
     parser.add_argument('--optimizer_type', type=str, default="AdamW", choices=["AdamW"],
@@ -58,7 +60,7 @@ def train(args, model, train_loader, dev_loader, optimizer, scheduler):
 
     model_type = 'ft' if args.finetune else 'scr'
     experiment_name = args.experiment_name  # fixed
-    checkpoint_dir = os.path.join('checkpoints', f'{model_type}_experiments', args.experiment_name)
+    checkpoint_dir = get_checkpoint_dir(args)
     gt_sql_path = os.path.join(f'data/dev.sql')
     gt_record_path = os.path.join(f'records/dev_gt_records.pkl')
     model_sql_path = os.path.join(f'results/t5_{model_type}_{experiment_name}_dev.sql')
