@@ -152,7 +152,7 @@ class T5Dataset(Dataset):
                 'Vocabulary size (natural language)': vocab_size_nl,
                 'Vocabulary size (SQL)': vocab_size_sql,
             }
-        ])
+        ]).T
 
     def _calc_processed_dataset_statistics(self):
         num_examples = len(self.examples)
@@ -180,7 +180,7 @@ class T5Dataset(Dataset):
                 'Vocabulary size (natural language)': vocab_size_nl,
                 'Vocabulary size (SQL)': vocab_size_sql,
             }
-        ])
+        ]).T
 
 
 def normal_collate_fn(batch):

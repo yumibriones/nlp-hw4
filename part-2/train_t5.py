@@ -17,6 +17,14 @@ from utils import compute_metrics, save_queries_and_records
 DEVICE = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 PAD_IDX = 0
 
+
+def get_output_run_tag(model_type, experiment_name):
+    """Build output tag without duplicating prefixes like t5_ft_..."""
+    expected_prefix = f"t5_{model_type}_"
+    if experiment_name.startswith(expected_prefix):
+        return experiment_name
+    return f"{expected_prefix}{experiment_name}"
+
 def get_args():
     '''
     Arguments for training. You may choose to change or extend these as you see fit.
@@ -63,11 +71,12 @@ def train(args, model, train_loader, dev_loader, optimizer, scheduler):
 
     model_type = 'ft' if args.finetune else 'scr'
     experiment_name = args.experiment_name  # fixed
+    run_tag = get_output_run_tag(model_type, experiment_name)
     checkpoint_dir = get_checkpoint_dir(args)
     gt_sql_path = os.path.join(f'data/dev.sql')
-    gt_record_path = os.path.join(f'records/dev_gt_records.pkl')
-    model_sql_path = os.path.join(f'results/t5_{model_type}_{experiment_name}_dev.sql')
-    model_record_path = os.path.join(f'records/t5_{model_type}_{experiment_name}_dev.pkl')
+    gt_record_path = os.path.join(f'records/ground_truth_dev.pkl')
+    model_sql_path = os.path.join(f'results/{run_tag}_dev.sql')
+    model_record_path = os.path.join(f'records/{run_tag}_dev.pkl')
     for epoch in range(args.max_n_epochs):
         tr_loss = train_epoch(args, model, train_loader, optimizer, scheduler)
         print(f"Epoch {epoch}: Average train loss was {tr_loss}")
@@ -270,10 +279,11 @@ def main():
     # Dev set
     experiment_name = args.experiment_name
     model_type = 'ft' if args.finetune else 'scr'
+    run_tag = get_output_run_tag(model_type, experiment_name)
     gt_sql_path = os.path.join(f'data/dev.sql')
-    gt_record_path = os.path.join(f'records/dev_gt_records.pkl')
-    model_sql_path = os.path.join(f'results/t5_{model_type}_{experiment_name}_dev.sql')
-    model_record_path = os.path.join(f'records/t5_{model_type}_{experiment_name}_dev.pkl')
+    gt_record_path = os.path.join(f'records/ground_truth_dev.pkl')
+    model_sql_path = os.path.join(f'results/{run_tag}_dev.sql')
+    model_record_path = os.path.join(f'records/{run_tag}_dev.pkl')
     # fix to match output of eval_epoch: return eval_loss, record_f1, record_em, sql_em, error_rate
     dev_loss, dev_record_f1, dev_record_em, dev_sql_em, dev_error_rate = eval_epoch(args, model, dev_loader,
                                                                                     gt_sql_path, model_sql_path,
@@ -283,8 +293,8 @@ def main():
     print(f"Dev set results: {dev_error_rate*100:.2f}% of the generated outputs led to SQL errors")
 
     # Test set
-    model_sql_path = os.path.join(f'results/t5_{model_type}_{experiment_name}_test.sql')
-    model_record_path = os.path.join(f'records/t5_{model_type}_{experiment_name}_test.pkl')
+    model_sql_path = os.path.join(f'results/{run_tag}_test.sql')
+    model_record_path = os.path.join(f'records/{run_tag}_test.pkl')
     test_inference(args, model, test_loader, model_sql_path, model_record_path)
 
 if __name__ == "__main__":
