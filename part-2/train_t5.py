@@ -5,6 +5,7 @@ from tqdm import tqdm
 import torch
 import torch.nn as nn
 import numpy as np
+import pandas as pd
 import wandb
 
 from t5_utils import initialize_model, initialize_optimizer_and_scheduler, save_model, load_model_from_checkpoint, setup_wandb, get_checkpoint_dir
@@ -50,6 +51,8 @@ def get_args():
     # Data hyperparameters
     parser.add_argument('--batch_size', type=int, default=16)
     parser.add_argument('--test_batch_size', type=int, default=16)
+    parser.add_argument('--calc_dataset_stats', action='store_true',
+                        help="Whether to calculate and save dataset statistics as CSVs in the stats/ directory")
 
     args = parser.parse_args()
     return args
@@ -246,6 +249,17 @@ def main():
     model = initialize_model(args)
     optimizer, scheduler = initialize_optimizer_and_scheduler(args, model, len(train_loader))
 
+    # Save dataset statistics before/after processing for train and dev splits
+    if args.calc_dataset_stats:
+        os.makedirs('stats', exist_ok=True)
+        train_raw_df, train_processed_df = train_loader.dataset.compare_dataset_statistics()
+        train_raw_df.to_csv(os.path.join('stats', f'{args.experiment_name}_train_raw_stats.csv'), index=False)
+        train_processed_df.to_csv(os.path.join('stats', f'{args.experiment_name}_train_processed_stats.csv'), index=False)
+
+        dev_raw_df, dev_processed_df = dev_loader.dataset.compare_dataset_statistics()
+        dev_raw_df.to_csv(os.path.join('stats', f'{args.experiment_name}_dev_raw_stats.csv'), index=False)
+        dev_processed_df.to_csv(os.path.join('stats', f'{args.experiment_name}_dev_processed_stats.csv'), index=False)
+        
     # Train 
     train(args, model, train_loader, dev_loader, optimizer, scheduler)
 

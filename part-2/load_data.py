@@ -10,6 +10,7 @@ import nltk
 nltk.download('punkt')
 from transformers import T5TokenizerFast
 import torch
+import pandas as pd
 
 PAD_IDX = 0
 
@@ -33,6 +34,8 @@ class T5Dataset(Dataset):
         # make sure split is valid
         if split not in ["train", "dev", "test"]:
             raise ValueError("split must be one of 'train', 'dev', or 'test'")
+        self.data_folder = data_folder
+        self.split = split
         # You should be using the 'google-t5/t5-small' tokenizer checkpoint to tokenize both the encoder and decoder output. 
         self.tokenizer = T5TokenizerFast.from_pretrained('google-t5/t5-small')
         self.decoder_start_id = self.tokenizer.convert_tokens_to_ids("<extra_id_0>")
@@ -95,6 +98,89 @@ class T5Dataset(Dataset):
     def __getitem__(self, idx):
         # returns the example at index idx in self.examples
         return self.examples[idx]
+
+    def calc_dataset_statistics(self, stage="processed"):
+        """
+        Computes dataset stats before or after preprocessing.
+
+        Inputs:
+            * stage (str): "raw" or "processed"
+
+        Returns:
+            * pd.DataFrame with one row and columns:
+              Number of examples, Mean sentence length, Mean SQL query length,
+              Vocabulary size (natural language), Vocabulary size (SQL)
+        """
+        if stage not in ["raw", "processed"]:
+            raise ValueError("stage must be one of 'raw' or 'processed'")
+
+        if stage == "raw":
+            return self._calc_raw_dataset_statistics()
+        return self._calc_processed_dataset_statistics()
+
+    def compare_dataset_statistics(self):
+        """Return raw and processed statistics as two DataFrames."""
+        raw_df = self._calc_raw_dataset_statistics()
+        processed_df = self._calc_processed_dataset_statistics()
+        return raw_df, processed_df
+
+    def _calc_raw_dataset_statistics(self):
+        train_x, train_y, dev_x, dev_y, test_x = load_prompting_data(self.data_folder)
+        if self.split == "train":
+            data_x, data_y = train_x, train_y
+        elif self.split == "dev":
+            data_x, data_y = dev_x, dev_y
+        else:
+            data_x, data_y = test_x, None
+
+        num_examples = len(data_x)
+        nl_tokens = [nltk.word_tokenize(text) for text in data_x]
+        mean_sentence_length = sum(len(tokens) for tokens in nl_tokens) / max(num_examples, 1)
+        vocab_size_nl = len(set(token for tokens in nl_tokens for token in tokens))
+        mean_sql_query_length = float('nan')
+        vocab_size_sql = float('nan')
+        if data_y is not None:
+            sql_tokens = [nltk.word_tokenize(query) for query in data_y]
+            mean_sql_query_length = sum(len(tokens) for tokens in sql_tokens) / max(num_examples, 1)
+            vocab_size_sql = len(set(token for tokens in sql_tokens for token in tokens))
+
+        return pd.DataFrame([
+            {
+                'Number of examples': num_examples,
+                'Mean sentence length': mean_sentence_length,
+                'Mean SQL query length': mean_sql_query_length,
+                'Vocabulary size (natural language)': vocab_size_nl,
+                'Vocabulary size (SQL)': vocab_size_sql,
+            }
+        ])
+
+    def _calc_processed_dataset_statistics(self):
+        num_examples = len(self.examples)
+        mean_sentence_length = (
+            sum(len(example['encoder_input']) for example in self.examples) / max(num_examples, 1)
+        )
+        vocab_size_nl = len(
+            set(token_id.item() for example in self.examples for token_id in example['encoder_input'])
+        )
+        mean_sql_query_length = float('nan')
+        vocab_size_sql = float('nan')
+        if self.split != "test":
+            mean_sql_query_length = (
+                sum(len(example['decoder_target']) for example in self.examples) / max(num_examples, 1)
+            )
+            vocab_size_sql = len(
+                set(token_id.item() for example in self.examples for token_id in example['decoder_target'])
+            )
+
+        return pd.DataFrame([
+            {
+                'Number of examples': num_examples,
+                'Mean sentence length': mean_sentence_length,
+                'Mean SQL query length': mean_sql_query_length,
+                'Vocabulary size (natural language)': vocab_size_nl,
+                'Vocabulary size (SQL)': vocab_size_sql,
+            }
+        ])
 
 
 def normal_collate_fn(batch):
