@@ -9,6 +9,7 @@ import wandb
 
 from t5_utils import initialize_model, initialize_optimizer_and_scheduler, save_model, load_model_from_checkpoint, setup_wandb
 from transformers import GenerationConfig
+from transformers import T5TokenizerFast
 from load_data import load_t5_data
 from utils import compute_metrics, save_queries_and_records
 
@@ -56,6 +57,7 @@ def train(args, model, train_loader, dev_loader, optimizer, scheduler):
     epochs_since_improvement = 0
 
     model_type = 'ft' if args.finetune else 'scr'
+    experiment_name = args.experiment_name  # fixed
     checkpoint_dir = os.path.join('checkpoints', f'{model_type}_experiments', args.experiment_name)
     gt_sql_path = os.path.join(f'data/dev.sql')
     gt_record_path = os.path.join(f'records/dev_gt_records.pkl')
@@ -139,26 +141,61 @@ def eval_epoch(args, model, dev_loader, gt_sql_pth, model_sql_path, gt_record_pa
     we found the cross-entropy loss (in the evaluation set) to be well (albeit imperfectly) correlated with F1 performance.
     '''
     model.eval()
+    tokenizer = T5TokenizerFast.from_pretrained('google-t5/t5-small')
+    all_generated_sqls = []
+    total_loss = 0.0
+    total_tokens = 0
+
     with torch.no_grad():
-        # copied from train_epoch() above
         for encoder_input, encoder_mask, decoder_input, decoder_targets, _ in tqdm(dev_loader):
             # send to device
             encoder_input = encoder_input.to(DEVICE)
             encoder_mask = encoder_mask.to(DEVICE)
             decoder_input = decoder_input.to(DEVICE)
             decoder_targets = decoder_targets.to(DEVICE)
-            
+
+            # get model outputs and compute loss
             logits = model(
                 input_ids=encoder_input,
                 attention_mask=encoder_mask,
                 decoder_input_ids=decoder_input,
             )['logits']
 
+            # compute CE loss on non-padding tokens
             non_pad = decoder_targets != PAD_IDX
-            eval_loss = nn.CrossEntropyLoss()(logits[non_pad], decoder_targets[non_pad])
-            # order of returns based on compute_metrics() in utils.py
-            sql_em, record_em, record_f1, model_error_msgs = compute_metrics(gt_sql_pth, model_sql_path, gt_record_path, model_record_path)
-            error_rate = len(model_error_msgs) / len(model_sql_path)
+            loss = nn.CrossEntropyLoss()(logits[non_pad], decoder_targets[non_pad])
+            num_tokens = torch.sum(non_pad).item()
+            # get loss for all tokens
+            total_loss += loss.item() * num_tokens
+            total_tokens += num_tokens
+
+            # generate SQL queries with the model
+            generated_ids = model.generate(
+                input_ids=encoder_input,
+                attention_mask=encoder_mask,
+                generation_config=GenerationConfig(max_new_tokens=200, num_beams=1, do_sample=False),
+            )
+            # decode generated SQL queries and add to list of all generated SQLs
+            generated_sqls = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+            all_generated_sqls.extend([sql.strip() for sql in generated_sqls])
+
+    # save generated SQL queries and their associated records
+    os.makedirs(os.path.dirname(model_sql_path), exist_ok=True)
+    os.makedirs(os.path.dirname(model_record_path), exist_ok=True)
+    save_queries_and_records(all_generated_sqls, model_sql_path, model_record_path)
+
+    # compute metrics using the saved SQL queries and records
+    sql_em, record_em, record_f1, model_error_msgs = compute_metrics(
+        gt_sql_pth,
+        model_sql_path,
+        gt_record_path,
+        model_record_path,
+    )
+    # error rate is percentage of generated SQL queries that led to an error message when executed against the database
+    error_rate = np.mean([1.0 if msg else 0.0 for msg in model_error_msgs])
+    
+    # compute average loss per token for evaluation set
+    eval_loss = total_loss / max(total_tokens, 1)
 
     # order of returns based on train() above
     return eval_loss, record_f1, record_em, sql_em, error_rate
@@ -168,7 +205,31 @@ def test_inference(args, model, test_loader, model_sql_path, model_record_path):
     You must implement inference to compute your model's generated SQL queries and its associated 
     database records. Implementation should be very similar to eval_epoch.
     '''
-    pass
+
+    # pretty much same as eval but without loss/metrics
+    model.eval()
+    tokenizer = T5TokenizerFast.from_pretrained('google-t5/t5-small')
+    all_generated_sqls = []
+
+    with torch.no_grad():
+        for encoder_input, encoder_mask, initial_decoder_inputs in tqdm(test_loader):
+            encoder_input = encoder_input.to(DEVICE)
+            encoder_mask = encoder_mask.to(DEVICE)
+            initial_decoder_inputs = initial_decoder_inputs.to(DEVICE)
+
+            generated_ids = model.generate(
+                input_ids=encoder_input,
+                attention_mask=encoder_mask,
+                decoder_input_ids=initial_decoder_inputs,
+                generation_config=GenerationConfig(max_new_tokens=200, num_beams=1, do_sample=False)
+            )
+            generated_sqls = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+            all_generated_sqls.extend([sql.strip() for sql in generated_sqls])
+
+    os.makedirs(os.path.dirname(model_sql_path), exist_ok=True)
+    os.makedirs(os.path.dirname(model_record_path), exist_ok=True)
+    save_queries_and_records(all_generated_sqls, model_sql_path, model_record_path)
+
 
 def main():
     # Get key arguments
