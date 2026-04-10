@@ -268,10 +268,26 @@ def load_lines(path):
     return lines
 
 def load_prompting_data(data_folder):
-    """Use helper to load text prompts and SQL queries from data folder."""
-    train_x = load_lines(os.path.join(data_folder, 'train_x.txt'))
-    train_y = load_lines(os.path.join(data_folder, 'train_y.txt'))
-    dev_x = load_lines(os.path.join(data_folder, 'dev_x.txt'))
-    dev_y = load_lines(os.path.join(data_folder, 'dev_y.txt'))
-    test_x = load_lines(os.path.join(data_folder, 'test_x.txt'))
+    """Load text-to-SQL data from canonical .nl/.sql files.
+
+    Returns:
+        train_x, train_y, dev_x, dev_y, test_x
+    where x is natural language and y is SQL.
+    """
+    # follow structure in data folder
+    train_nl_path = os.path.join(data_folder, 'train.nl')
+    train_sql_path = os.path.join(data_folder, 'train.sql')
+    dev_nl_path = os.path.join(data_folder, 'dev.nl')
+    dev_sql_path = os.path.join(data_folder, 'dev.sql')
+    test_nl_path = os.path.join(data_folder, 'test.nl')
+
+    # if they all exist, load and return
+    if all(os.path.exists(p) for p in [train_nl_path, train_sql_path, dev_nl_path, dev_sql_path, test_nl_path]):
+        train_x = load_lines(train_nl_path)
+        train_y = load_lines(train_sql_path)
+        dev_x = load_lines(dev_nl_path)
+        dev_y = load_lines(dev_sql_path)
+        test_x = load_lines(test_nl_path)
+        return train_x, train_y, dev_x, dev_y, test_x
+    
     return train_x, train_y, dev_x, dev_y, test_x
