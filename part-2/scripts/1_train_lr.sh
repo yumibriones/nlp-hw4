@@ -19,7 +19,7 @@ set -euo pipefail
 cd /gpfs/scratch/yb2612/classes/nlp/hw4/nlp-hw4/part-2
 
 # train configuration
-EXPERIMENT_NAME="weight_decay_warmup"  # name for logging and checkpointing
+EXPERIMENT_NAME="lr_1e-5"  # name for logging and checkpointing
 MODEL_TYPE="pretrained"  # choices: pretrained, scratch
 
 # run training + built-in dev/test evaluation
@@ -27,7 +27,7 @@ python3 train_t5.py \
     --finetune \
     --model_type "${MODEL_TYPE}" \
     --optimizer_type AdamW \
-    --learning_rate 1e-4 \
+    --learning_rate 1e-5 \
     --weight_decay 0.001 \
     --scheduler_type cosine \
     --num_warmup_epochs 3 \

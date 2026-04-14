@@ -31,8 +31,8 @@ python3 train_t5.py \
     --weight_decay 0.0 \
     --scheduler_type cosine \
     --num_warmup_epochs 0 \
-    --max_n_epochs 20 \
-    --patience_epochs 3 \
+    --max_n_epochs 50 \
+    --patience_epochs 10 \
     --batch_size 16 \
     --test_batch_size 16 \
     --use_wandb \
