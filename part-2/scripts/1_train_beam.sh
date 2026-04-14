@@ -19,19 +19,19 @@ set -euo pipefail
 cd /gpfs/scratch/yb2612/classes/nlp/hw4/nlp-hw4/part-2
 
 # train configuration
-EXPERIMENT_NAME="defaults"  # name for logging and checkpointing
+EXPERIMENT_NAME="beam_4"  # name for logging and checkpointing
 MODEL_TYPE="pretrained"  # choices: pretrained, scratch
 
 # run training + built-in dev/test evaluation
 python3 train_t5.py \
     --finetune \
     --model_type "${MODEL_TYPE}" \
-    --num_beams 1 \
+    --num_beams 4 \
     --optimizer_type AdamW \
     --learning_rate 1e-4 \
-    --weight_decay 0.0 \
+    --weight_decay 0.001 \
     --scheduler_type cosine \
-    --num_warmup_epochs 0 \
+    --num_warmup_epochs 3 \
     --max_n_epochs 30 \
     --patience_epochs 5 \
     --batch_size 16 \

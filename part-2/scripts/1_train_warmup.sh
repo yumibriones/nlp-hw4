@@ -26,12 +26,13 @@ MODEL_TYPE="pretrained"  # choices: pretrained, scratch
 python3 train_t5.py \
     --finetune \
     --model_type "${MODEL_TYPE}" \
+    --num_beams 1 \
     --optimizer_type AdamW \
     --learning_rate 1e-4 \
     --weight_decay 0.001 \
     --scheduler_type cosine \
     --num_warmup_epochs 3 \
-    --max_n_epochs 20 \
+    --max_n_epochs 30 \
     --patience_epochs 5 \
     --batch_size 16 \
     --test_batch_size 16 \

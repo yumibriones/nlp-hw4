@@ -35,6 +35,22 @@ def get_args():
     parser.add_argument('--finetune', action='store_true', help="Whether to finetune T5 or not")
     parser.add_argument('--model_type', type=str, default="pretrained", choices=["pretrained", "scratch"],
                         help="Whether to finetune the pretrained model associated with the 'google-t5/t5-small' checkpoint or to train a T5 model initialized with the 'google-t5/t5-small' config from scratch")
+    parser.add_argument('--num_beams', type=int, default=1, help="Number of beams to use for generation during evaluation")
+    parser.add_argument('--max_source_length', type=int, default=128,
+                        help="Maximum source (NL) token length during tokenization")
+    parser.add_argument('--max_target_length', type=int, default=256,
+                        help="Maximum target (SQL) token length during tokenization")
+    parser.add_argument('--max_new_tokens', type=int, default=256,
+                        help="Maximum number of new tokens to generate during eval/test")
+    parser.add_argument('--add_task_prefix', action='store_true',
+                        help="If set, prepend a task prefix to NL inputs")
+    parser.add_argument('--task_prefix', type=str, default='translate English to SQL:',
+                        help="Task prefix text used when --add_task_prefix is enabled")
+    parser.add_argument('--normalize_whitespace', dest='normalize_whitespace', action='store_true',
+                        help="Collapse repeated whitespace in NL and SQL inputs")
+    parser.add_argument('--no_normalize_whitespace', dest='normalize_whitespace', action='store_false',
+                        help="Disable whitespace normalization")
+    parser.set_defaults(normalize_whitespace=True)
     
     # Training hyperparameters
     parser.add_argument('--optimizer_type', type=str, default="AdamW", choices=["AdamW"],
@@ -161,12 +177,13 @@ def eval_epoch(args, model, dev_loader, gt_sql_pth, model_sql_path, gt_record_pa
     total_tokens = 0
 
     with torch.no_grad():
-        for encoder_input, encoder_mask, decoder_input, decoder_targets, _ in tqdm(dev_loader):
+        for encoder_input, encoder_mask, decoder_input, decoder_targets, initial_decoder_inputs in tqdm(dev_loader):
             # send to device
             encoder_input = encoder_input.to(DEVICE)
             encoder_mask = encoder_mask.to(DEVICE)
             decoder_input = decoder_input.to(DEVICE)
             decoder_targets = decoder_targets.to(DEVICE)
+            initial_decoder_inputs = initial_decoder_inputs.to(DEVICE)
 
             # get model outputs and compute loss
             logits = model(
@@ -187,7 +204,12 @@ def eval_epoch(args, model, dev_loader, gt_sql_pth, model_sql_path, gt_record_pa
             generated_ids = model.generate(
                 input_ids=encoder_input,
                 attention_mask=encoder_mask,
-                generation_config=GenerationConfig(max_new_tokens=200, num_beams=1, do_sample=False),
+                decoder_input_ids=initial_decoder_inputs,
+                generation_config=GenerationConfig(
+                    max_new_tokens=args.max_new_tokens,
+                    num_beams=args.num_beams,
+                    do_sample=False,
+                ),
             )
             # decode generated SQL queries and add to list of all generated SQLs
             generated_sqls = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
@@ -236,7 +258,11 @@ def test_inference(args, model, test_loader, model_sql_path, model_record_path):
                 input_ids=encoder_input,
                 attention_mask=encoder_mask,
                 decoder_input_ids=initial_decoder_inputs,
-                generation_config=GenerationConfig(max_new_tokens=200, num_beams=1, do_sample=False)
+                generation_config=GenerationConfig(
+                    max_new_tokens=args.max_new_tokens,
+                    num_beams=args.num_beams,
+                    do_sample=False,
+                )
             )
             generated_sqls = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
             all_generated_sqls.extend([sql.strip() for sql in generated_sqls])
@@ -254,7 +280,15 @@ def main():
         setup_wandb(args)
 
     # Load the data and the model
-    train_loader, dev_loader, test_loader = load_t5_data(args.batch_size, args.test_batch_size)
+    train_loader, dev_loader, test_loader = load_t5_data(
+        args.batch_size,
+        args.test_batch_size,
+        max_source_length=args.max_source_length,
+        max_target_length=args.max_target_length,
+        add_task_prefix=args.add_task_prefix,
+        task_prefix=args.task_prefix,
+        normalize_whitespace=args.normalize_whitespace,
+    )
     model = initialize_model(args)
     optimizer, scheduler = initialize_optimizer_and_scheduler(args, model, len(train_loader))
 

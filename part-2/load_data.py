@@ -16,7 +16,16 @@ PAD_IDX = 0
 
 class T5Dataset(Dataset):
 
-    def __init__(self, data_folder, split):
+    def __init__(
+        self,
+        data_folder,
+        split,
+        max_source_length=128,
+        max_target_length=256,
+        add_task_prefix=False,
+        task_prefix="translate English to SQL:",
+        normalize_whitespace=True,
+    ):
         '''
         Skeleton for the class for performing data processing for the T5 model.
 
@@ -36,10 +45,29 @@ class T5Dataset(Dataset):
             raise ValueError("split must be one of 'train', 'dev', or 'test'")
         self.data_folder = data_folder
         self.split = split
+        self.max_source_length = max_source_length
+        self.max_target_length = max_target_length
+        self.add_task_prefix = add_task_prefix
+        self.task_prefix = task_prefix.strip()
+        self.normalize_whitespace = normalize_whitespace
         # You should be using the 'google-t5/t5-small' tokenizer checkpoint to tokenize both the encoder and decoder output. 
         self.tokenizer = T5TokenizerFast.from_pretrained('google-t5/t5-small')
         self.decoder_start_id = self.tokenizer.convert_tokens_to_ids("<extra_id_0>")
         self.process_data(data_folder, split, self.tokenizer)
+
+    def _normalize_text(self, text):
+        if not self.normalize_whitespace:
+            return text
+        return " ".join(text.split())
+
+    def _preprocess_nl(self, text):
+        text = self._normalize_text(text)
+        if self.add_task_prefix:
+            return f"{self.task_prefix} {text}".strip()
+        return text
+
+    def _preprocess_sql(self, text):
+        return self._normalize_text(text)
 
     def process_data(self, data_folder, split, tokenizer):
         """
@@ -58,11 +86,17 @@ class T5Dataset(Dataset):
             # load_prompting_data() returns train_x, train_y, dev_x, dev_y, test_x
             _, _, _, _, test_x = load_prompting_data(data_folder)
             for x in test_x:
+                x = self._preprocess_nl(x)
                 # tokenizer returns a dict {input_ids: tensor, attention_mask: tensor, ...}
                 # we just care about input_ids and attention_mask for the encoder
                 # You want to provide the decoder some beginning of sentence token
                 # Any extra-id on the T5Tokenizer should serve that purpose.
-                encoder_tokens = tokenizer(x, return_tensors="pt", truncation=True)
+                encoder_tokens = tokenizer(
+                    x,
+                    return_tensors="pt",
+                    truncation=True,
+                    max_length=self.max_source_length,
+                )
                 example = {
                     'encoder_input': encoder_tokens['input_ids'].squeeze(0),
                     'encoder_mask': encoder_tokens['attention_mask'].squeeze(0),
@@ -75,8 +109,20 @@ class T5Dataset(Dataset):
             data_y = train_y if split == "train" else dev_y
 
             for x, y in zip(data_x, data_y):
-                encoder_tokens = tokenizer(x, return_tensors="pt", truncation=True)
-                target_ids = tokenizer(y, return_tensors="pt", truncation=True)['input_ids'].squeeze(0)
+                x = self._preprocess_nl(x)
+                y = self._preprocess_sql(y)
+                encoder_tokens = tokenizer(
+                    x,
+                    return_tensors="pt",
+                    truncation=True,
+                    max_length=self.max_source_length,
+                )
+                target_ids = tokenizer(
+                    y,
+                    return_tensors="pt",
+                    truncation=True,
+                    max_length=self.max_target_length,
+                )['input_ids'].squeeze(0)
                 initial_decoder_input = torch.tensor([self.decoder_start_id], dtype=torch.long)
                 # use BOS + shifted target as decoder input
                 decoder_input = torch.cat([initial_decoder_input, target_ids[:-1]], dim=0)
@@ -209,7 +255,7 @@ def normal_collate_fn(batch):
 
     # pad to the max length in the batch and stack into tensors of shape BxT
     encoder_ids = pad_sequence(encoder_ids, batch_first=True, padding_value=PAD_IDX)
-    encoder_mask = pad_sequence(encoder_mask, batch_first=True, padding_value=0)
+    encoder_mask = pad_sequence(encoder_mask, batch_first=True, padding_value=PAD_IDX)
     decoder_inputs = pad_sequence(decoder_inputs, batch_first=True, padding_value=PAD_IDX)
     decoder_targets = pad_sequence(decoder_targets, batch_first=True, padding_value=PAD_IDX)
     initial_decoder_inputs = pad_sequence(initial_decoder_inputs, batch_first=True, padding_value=PAD_IDX)
@@ -236,26 +282,74 @@ def test_collate_fn(batch):
     initial_decoder_inputs = [example['initial_decoder_input'] for example in batch]
 
     encoder_ids = pad_sequence(encoder_ids, batch_first=True, padding_value=PAD_IDX)
-    encoder_mask = pad_sequence(encoder_mask, batch_first=True, padding_value=0)
+    encoder_mask = pad_sequence(encoder_mask, batch_first=True, padding_value=PAD_IDX)
     initial_decoder_inputs = pad_sequence(initial_decoder_inputs, batch_first=True, padding_value=PAD_IDX)
 
     return encoder_ids, encoder_mask, initial_decoder_inputs
 
-def get_dataloader(batch_size, split):
+def get_dataloader(
+    batch_size,
+    split,
+    max_source_length=128,
+    max_target_length=256,
+    add_task_prefix=False,
+    task_prefix="translate English to SQL:",
+    normalize_whitespace=True,
+):
     """Build dataloader for split"""
     data_folder = 'data'
-    dset = T5Dataset(data_folder, split)
+    dset = T5Dataset(
+        data_folder,
+        split,
+        max_source_length=max_source_length,
+        max_target_length=max_target_length,
+        add_task_prefix=add_task_prefix,
+        task_prefix=task_prefix,
+        normalize_whitespace=normalize_whitespace,
+    )
     shuffle = split == "train"
     collate_fn = normal_collate_fn if split != "test" else test_collate_fn
 
     dataloader = DataLoader(dset, batch_size=batch_size, shuffle=shuffle, collate_fn=collate_fn)
     return dataloader
 
-def load_t5_data(batch_size, test_batch_size):
+def load_t5_data(
+    batch_size,
+    test_batch_size,
+    max_source_length=128,
+    max_target_length=256,
+    add_task_prefix=False,
+    task_prefix="translate English to SQL:",
+    normalize_whitespace=True,
+):
     """Load data for each split"""
-    train_loader = get_dataloader(batch_size, "train")
-    dev_loader = get_dataloader(test_batch_size, "dev")
-    test_loader = get_dataloader(test_batch_size, "test")
+    train_loader = get_dataloader(
+        batch_size,
+        "train",
+        max_source_length=max_source_length,
+        max_target_length=max_target_length,
+        add_task_prefix=add_task_prefix,
+        task_prefix=task_prefix,
+        normalize_whitespace=normalize_whitespace,
+    )
+    dev_loader = get_dataloader(
+        test_batch_size,
+        "dev",
+        max_source_length=max_source_length,
+        max_target_length=max_target_length,
+        add_task_prefix=add_task_prefix,
+        task_prefix=task_prefix,
+        normalize_whitespace=normalize_whitespace,
+    )
+    test_loader = get_dataloader(
+        test_batch_size,
+        "test",
+        max_source_length=max_source_length,
+        max_target_length=max_target_length,
+        add_task_prefix=add_task_prefix,
+        task_prefix=task_prefix,
+        normalize_whitespace=normalize_whitespace,
+    )
     
     return train_loader, dev_loader, test_loader
 
