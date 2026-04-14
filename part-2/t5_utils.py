@@ -1,4 +1,5 @@
 import os
+import re
 
 import torch
 
@@ -52,25 +53,59 @@ def mkdir(dirpath):
         except FileExistsError:
             pass
 
-def save_model(checkpoint_dir, model, best):
-    # Save model checkpoint to be able to load the model later
+def save_model(checkpoint_dir, model, best, epoch=None):
+    # Save model checkpoint with epoch number to be able to load the model later
     mkdir(checkpoint_dir)
+    # save best model with different name
     if best:
-        checkpoint_path = os.path.join(checkpoint_dir, 'best_model.pt')
+        checkpoint_path = os.path.join(checkpoint_dir, f'best_model_epoch_{epoch}.pt')
     else:
-        checkpoint_path = os.path.join(checkpoint_dir, 'model.pt')
+        checkpoint_path = os.path.join(checkpoint_dir, f'model_epoch_{epoch}.pt')
+
     torch.save(model.state_dict(), checkpoint_path)
 
-def load_model_from_checkpoint(args, best):
+def load_model_from_checkpoint(args, best, return_epoch=False):
     # Load model from a checkpoint
     checkpoint_dir = get_checkpoint_dir(args)
+
+    # use regex to find the checkpoint with the highest epoch number
     if best:
-        checkpoint_path = os.path.join(checkpoint_dir, 'best_model.pt')
-    else:        
-        checkpoint_path = os.path.join(checkpoint_dir, 'model.pt')
+        pattern = re.compile(r'^best_model_epoch_(\d+)\.pt$')
+    else:
+        pattern = re.compile(r'^model_epoch_(\d+)\.pt$')
+
+    checkpoint_path = None
+    epoch = None
+
+    # if checkpoint directory exists, find the checkpoint with the highest epoch number
+    if os.path.isdir(checkpoint_dir):
+        candidates = []
+        for fname in os.listdir(checkpoint_dir):
+            # match the filename with the regex pattern to extract the epoch number
+            match = pattern.match(fname)
+            if match:
+                # append tuple of (epoch number, filename) to candidates list
+                candidates.append((int(match.group(1)), fname))
+
+        if candidates:
+            # get filename of epoch with highest number
+            epoch, fname = max(candidates, key=lambda x: x[0])
+            checkpoint_path = os.path.join(checkpoint_dir, fname)
+
+    # initialize model and load checkpoint if it exists
     model = initialize_model(args)
-    model.load_state_dict(torch.load(checkpoint_path, map_location=DEVICE))
-    return model.to(DEVICE)
+    if checkpoint_path is not None:
+        checkpoint = torch.load(checkpoint_path, map_location=DEVICE)
+        model.load_state_dict(checkpoint)
+    
+    # move model to device
+    model = model.to(DEVICE)
+    
+    # optionally return epoch number
+    if return_epoch:
+        return model, epoch
+        
+    return model
 
 def initialize_optimizer_and_scheduler(args, model, epoch_length):
     optimizer = initialize_optimizer(args, model)

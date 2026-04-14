@@ -104,9 +104,9 @@ def train(args, model, train_loader, dev_loader, optimizer, scheduler):
         else:
             epochs_since_improvement += 1
 
-        save_model(checkpoint_dir, model, best=False)
+        save_model(checkpoint_dir, model, best=False, epoch=epoch)
         if epochs_since_improvement == 0:
-            save_model(checkpoint_dir, model, best=True)
+            save_model(checkpoint_dir, model, best=True, epoch=epoch)
 
         if epochs_since_improvement >= args.patience_epochs:
             break
@@ -273,8 +273,10 @@ def main():
     train(args, model, train_loader, dev_loader, optimizer, scheduler)
 
     # Evaluate
-    model = load_model_from_checkpoint(args, best=True)
+    model, best_epoch = load_model_from_checkpoint(args, best=True, return_epoch=True)
     model.eval()
+    if best_epoch is not None:
+        print(f"Loaded best checkpoint from epoch {best_epoch}")
     
     # Dev set
     experiment_name = args.experiment_name

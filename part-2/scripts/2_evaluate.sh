@@ -1,9 +1,9 @@
 #!/bin/bash
-#SBATCH --partition=gl40s_dev,gl40s_short,gl40s_long,gpu8_short,gpu8_medium,gpu8_long,gpu4_dev,gpu4_short,gpu4_medium,gpu4_long,a100_dev,a100_short,a100_long
+#SBATCH --partition=gl40s_short,gl40s_long,gpu8_short,gpu8_medium,gpu8_long,gpu4_short,gpu4_medium,gpu4_long,a100_short,a100_long
 #SBATCH --job-name=1_evaluate
 #SBATCH --output=logs/%x-%j.out
 #SBATCH --error=logs/%x-%j.err
-#SBATCH --time=04:00:00
+#SBATCH --time=12:00:00
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=50G
