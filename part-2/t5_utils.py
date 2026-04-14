@@ -63,6 +63,17 @@ def save_model(checkpoint_dir, model, best, epoch=None):
         checkpoint_path = os.path.join(checkpoint_dir, f'model_epoch_{epoch}.pt')
 
     torch.save(model.state_dict(), checkpoint_path)
+    if best:
+        _delete_previous_best_model(checkpoint_dir, epoch)
+
+def _delete_previous_best_model(checkpoint_dir, epoch):
+    # Delete previous best model checkpoint to save disk space
+    pattern = re.compile(r'^best_model_epoch_(\d+)\.pt$')
+    if os.path.isdir(checkpoint_dir):
+        for fname in os.listdir(checkpoint_dir):
+            match = pattern.match(fname)
+            if match and int(match.group(1)) != epoch:
+                os.remove(os.path.join(checkpoint_dir, fname))
 
 def load_model_from_checkpoint(args, best, return_epoch=False):
     # Load model from a checkpoint
@@ -104,7 +115,7 @@ def load_model_from_checkpoint(args, best, return_epoch=False):
     # optionally return epoch number
     if return_epoch:
         return model, epoch
-        
+
     return model
 
 def initialize_optimizer_and_scheduler(args, model, epoch_length):

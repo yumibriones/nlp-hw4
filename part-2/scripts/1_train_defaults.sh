@@ -19,7 +19,7 @@ set -euo pipefail
 cd /gpfs/scratch/yb2612/classes/nlp/hw4/nlp-hw4/part-2
 
 # train configuration
-EXPERIMENT_NAME="t5_finetune"  # name for logging and checkpointing
+EXPERIMENT_NAME="defaults"  # name for logging and checkpointing
 MODEL_TYPE="pretrained"  # choices: pretrained, scratch
 
 # run training + built-in dev/test evaluation

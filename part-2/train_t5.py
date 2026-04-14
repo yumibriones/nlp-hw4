@@ -262,8 +262,8 @@ def main():
     if args.calc_dataset_stats:
         os.makedirs('stats', exist_ok=True)
         train_raw_df, train_processed_df = train_loader.dataset.compare_dataset_statistics()
-        train_raw_df.to_csv(os.path.join('stats', f'{args.experiment_name}_train_raw_stats.csv'), index=False)
-        train_processed_df.to_csv(os.path.join('stats', f'{args.experiment_name}_train_processed_stats.csv'), index=False)
+        train_raw_df.to_csv(os.path.join('stats', f'{args.experiment_name}_train_raw_stats.csv'), index=True)
+        train_processed_df.to_csv(os.path.join('stats', f'{args.experiment_name}_train_processed_stats.csv'), index=True)
 
         dev_raw_df, dev_processed_df = dev_loader.dataset.compare_dataset_statistics()
         dev_raw_df.to_csv(os.path.join('stats', f'{args.experiment_name}_dev_raw_stats.csv'), index=True)
