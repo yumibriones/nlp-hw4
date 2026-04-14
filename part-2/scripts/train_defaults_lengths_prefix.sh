@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --partition=gl40s_short,gl40s_long,gpu8_short,gpu8_medium,gpu8_long,gpu4_short,gpu4_medium,gpu4_long,a100_short,a100_long
-#SBATCH --job-name=default_lengths_prefix_full
+#SBATCH --job-name=length_512_prefix
 #SBATCH --output=logs/%x-%j.out
 #SBATCH --error=logs/%x-%j.err
 #SBATCH --time=12:00:00
@@ -19,7 +19,7 @@ set -euo pipefail
 cd /gpfs/scratch/yb2612/classes/nlp/hw4/nlp-hw4/part-2
 
 # train configuration
-EXPERIMENT_NAME="default_lengths_prefix"  # name for logging and checkpointing
+EXPERIMENT_NAME="length_512_prefix"  # name for logging and checkpointing
 MODEL_TYPE="pretrained"  # choices: pretrained, scratch
 
 # run training + built-in dev/test evaluation
@@ -40,8 +40,8 @@ python3 train_t5.py \
     --experiment_name "${EXPERIMENT_NAME}" \
     --calc_dataset_stats \
     --max_source_length 96 \
-    --max_target_length 384 \
-    --max_new_tokens 384 \
+    --max_target_length 512 \
+    --max_new_tokens 512 \
     --finetune_scope full \
     --normalize_whitespace \
     --add_task_prefix
