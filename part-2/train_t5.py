@@ -266,8 +266,8 @@ def main():
         train_processed_df.to_csv(os.path.join('stats', f'{args.experiment_name}_train_processed_stats.csv'), index=False)
 
         dev_raw_df, dev_processed_df = dev_loader.dataset.compare_dataset_statistics()
-        dev_raw_df.to_csv(os.path.join('stats', f'{args.experiment_name}_dev_raw_stats.csv'), index=False)
-        dev_processed_df.to_csv(os.path.join('stats', f'{args.experiment_name}_dev_processed_stats.csv'), index=False)
+        dev_raw_df.to_csv(os.path.join('stats', f'{args.experiment_name}_dev_raw_stats.csv'), index=True)
+        dev_processed_df.to_csv(os.path.join('stats', f'{args.experiment_name}_dev_processed_stats.csv'), index=True)
         
     # Train 
     train(args, model, train_loader, dev_loader, optimizer, scheduler)
