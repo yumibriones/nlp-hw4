@@ -36,6 +36,13 @@ def get_args():
     parser.add_argument('--model_type', type=str, default="pretrained", choices=["pretrained", "scratch"],
                         help="Whether to finetune the pretrained model associated with the 'google-t5/t5-small' checkpoint or to train a T5 model initialized with the 'google-t5/t5-small' config from scratch")
     parser.add_argument('--num_beams', type=int, default=1, help="Number of beams to use for generation during evaluation")
+    parser.add_argument('--finetune_scope', type=str, default='full',
+                        choices=['full', 'decoder_only', 'decoder_plus_top_encoder'],
+                        help="Which subset of T5 parameters to train")
+    parser.add_argument('--unfreeze_top_encoder_layers', type=int, default=2,
+                        help="How many top encoder blocks to unfreeze when using decoder_plus_top_encoder")
+    parser.add_argument('--unfreeze_shared_embeddings', action='store_true',
+                        help="If set, unfreeze T5 shared token embeddings")
     parser.add_argument('--max_source_length', type=int, default=128,
                         help="Maximum source (NL) token length during tokenization")
     parser.add_argument('--max_target_length', type=int, default=256,

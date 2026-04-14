@@ -11,6 +11,54 @@ import wandb
 DEVICE = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
 
+def _set_all_trainable(model, trainable):
+    for _, param in model.named_parameters():
+        param.requires_grad = trainable
+
+
+def _apply_finetune_scope(args, model):
+    """Configure which model submodules are trainable based on CLI args."""
+    scope = getattr(args, "finetune_scope", "full")
+    unfreeze_top_k = max(0, int(getattr(args, "unfreeze_top_encoder_layers", 2)))
+    unfreeze_shared = bool(getattr(args, "unfreeze_shared_embeddings", False))
+
+    # Full fine-tuning keeps everything trainable.
+    if scope == "full":
+        _set_all_trainable(model, True)
+    else:
+        _set_all_trainable(model, False)
+
+        # Decoder and LM head are the core components for SQL generation.
+        for _, p in model.decoder.named_parameters():
+            p.requires_grad = True
+        for _, p in model.lm_head.named_parameters():
+            p.requires_grad = True
+
+        if scope == "decoder_plus_top_encoder":
+            # Unfreeze top encoder blocks (e.g., block.5, block.4 for t5-small).
+            num_blocks = len(model.encoder.block)
+            start_idx = max(0, num_blocks - unfreeze_top_k)
+            for idx in range(start_idx, num_blocks):
+                for _, p in model.encoder.block[idx].named_parameters():
+                    p.requires_grad = True
+
+    if unfreeze_shared:
+        for _, p in model.shared.named_parameters():
+            p.requires_grad = True
+
+
+def _print_trainable_parameter_summary(model):
+    total = 0
+    trainable = 0
+    for _, p in model.named_parameters():
+        n = p.numel()
+        total += n
+        if p.requires_grad:
+            trainable += n
+    pct = 100.0 * trainable / max(total, 1)
+    print(f"Trainable parameters: {trainable:,} / {total:,} ({pct:.2f}%)")
+
+
 def get_checkpoint_dir(args):
     """Added helper function to build checkpoint directory path for save/load."""
     model_type = 'ft' if args.finetune else 'scr'
@@ -43,6 +91,10 @@ def initialize_model(args):
         model = T5ForConditionalGeneration(config)
     else:
         raise ValueError("model_type must be either 'pretrained' or 'scratch'")
+
+    _apply_finetune_scope(args, model)
+    _print_trainable_parameter_summary(model)
+
     # make sure to move model to device!
     return model.to(DEVICE)
 
