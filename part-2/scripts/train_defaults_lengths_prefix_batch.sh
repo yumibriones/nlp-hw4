@@ -5,7 +5,7 @@
 #SBATCH --error=logs/%x-%j.err
 #SBATCH --time=12:00:00
 #SBATCH --gres=gpu:1
-#SBATCH --cpus-per-task=4
+#SBATCH --cpus-per-task=10
 #SBATCH --mem=50G
 
 # activate conda env
@@ -32,8 +32,8 @@ python3 train_t5.py \
     --weight_decay 0.0 \
     --scheduler_type cosine \
     --num_warmup_epochs 0 \
-    --max_n_epochs 50 \
-    --patience_epochs 10 \
+    --max_n_epochs 80 \
+    --patience_epochs 15 \
     --batch_size 8 \
     --test_batch_size 16 \
     --use_wandb \
