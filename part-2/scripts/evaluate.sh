@@ -19,12 +19,11 @@
 # cd /gpfs/scratch/yb2612/classes/nlp/hw4/nlp-hw4/part-2
 
 # run script
-EXPERIMENT_NAME="default_lengths_prefix"
+EXPERIMENT_NAME="length_512_prefix"
 ERROR_TABLE_CSV="results/${EXPERIMENT_NAME}_error_table.csv"
 
 python3 evaluate.py \
     --predicted_sql results/t5_ft_${EXPERIMENT_NAME}_dev.sql \
-    --predicted_records records/t5_ft_${EXPERIMENT_NAME}_dev.pkl \
     --development_sql data/dev.sql \
     --development_records records/ground_truth_dev.pkl \
     --error_table_csv ${ERROR_TABLE_CSV}

@@ -1,8 +1,10 @@
 from argparse import ArgumentParser
 import csv
 import re
+import os
+import pickle
 
-from utils import compute_metrics, read_queries
+from utils import compute_metrics, read_queries, compute_records
 
 
 def get_args():
@@ -18,8 +20,9 @@ def get_args():
         "-pr",
         "--predicted_records",
         dest="pred_records",
-        required=True,
-        help="path to the predicted development database records",
+        required=False,
+        default=None,
+        help="path to the predicted development database records (if empty, will recompute)",
     )
     parser.add_argument(
         "-ds",
@@ -179,6 +182,22 @@ def save_table_csv(rows, csv_path):
 
 def main():
     args = get_args()
+    
+    # If predicted_records not provided, compute and save them
+    if args.pred_records is None:
+        pred_queries = read_queries(args.pred_sql)
+        print(f"Computing records for {len(pred_queries)} queries...")
+        recs, error_msgs = compute_records(pred_queries)
+        
+        # Infer output path from pred_sql
+        pred_records_path = args.pred_sql.replace('.sql', '.pkl')
+        os.makedirs(os.path.dirname(pred_records_path), exist_ok=True)
+        with open(pred_records_path, 'wb') as f:
+            pickle.dump((recs, error_msgs), f)
+        print(f"Saved recomputed records to: {pred_records_path}")
+        
+        args.pred_records = pred_records_path
+    
     sql_em, record_em, record_f1, model_error_msgs = compute_metrics(
         args.dev_sql,
         args.pred_sql,

@@ -92,22 +92,25 @@ def compute_records(processed_qs: List[str]):
         * processed_qs (List[str]): The list of SQL queries to execute
     '''
     num_threads = 10
-    timeout_secs = 120
+    timeout_per_query = 120  # Per-query timeout in seconds
 
     pool = ThreadPoolExecutor(num_threads)
-    futures = []
+    futures = {}  # Map future -> query_id
     for i, query in enumerate(processed_qs):
-        futures.append(pool.submit(compute_record, i, query))
+        future = pool.submit(compute_record, i, query)
+        futures[future] = i
         
     rec_dict = {}
-    try:
-        for x in tqdm(as_completed(futures, timeout=timeout_secs)):
-            query_id, rec, error_msg = x.result()
+    # Use as_completed without batch timeout - wait for each future individually
+    for future in tqdm(as_completed(futures.keys()), total=len(futures)):
+        query_id = futures[future]
+        try:
+            returned_id, rec, error_msg = future.result(timeout=timeout_per_query)
             rec_dict[query_id] = (rec, error_msg)
-    except:
-        for future in futures:
-            if not future.done():
-                future.cancel()
+        except TimeoutError:
+            rec_dict[query_id] = ([], "Query timed out")
+        except Exception as e:
+            rec_dict[query_id] = ([], str(e))
             
     recs = []
     error_msgs = []
