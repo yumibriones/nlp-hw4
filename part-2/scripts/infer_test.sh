@@ -19,7 +19,7 @@
 # cd /gpfs/scratch/yb2612/classes/nlp/hw4/nlp-hw4/part-2
 
 # run script
-EXPERIMENT_NAME="length_512_prefix"
+EXPERIMENT_NAME="length_512_prefix_lr"
 
 python3 infer_test.py \
     --experiment_name ${EXPERIMENT_NAME} \
